@@ -1,0 +1,65 @@
+service: web
+# app and org for use with dashboard.serverless.com
+# app: your app
+# org: your org
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+frameworkVersion: "2"
+variablesResolutionMode: 20210219
+
+plugins:
+  - serverless-finch
+
+custom:
+  client:
+    bucketName: "web-dev-s3bucket-test"
+    distributionFolder: build
+provider:
+  name: aws
+  runtime: nodejs14.x
+  # you can overwrite defaults here
+  stage: ${opt:stage, 'dev'}
+  #  region: us-east-1
+resources:
+  Resources:
+    S3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+        BucketName: web-${self:provider.stage}-s3bucket-test
+      DeletionPolicy: Retain
+    BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        PolicyDocument:
+          Id: TomoTestPolicy
+          Version: "2012-10-17"
+          Statement:
+            - Sid: PublicReadForGetBucketObjects
+              Effect: Allow
+              Principal: "*"
+              Action: "s3:GetObject"
+              Resource: !Join
+                - ""
+                - - "arn:aws:s3:::"
+                  - !Ref S3Bucket
+                  - /*
+        Bucket: !Ref S3Bucket
+  Outputs:
+    WebsiteURL:
+      Value: !GetAtt
+        - S3Bucket
+        - WebsiteURL
+      Description: URL for website hosted on S3
+    S3BucketSecureURL:
+      Value: !Join
+        - ""
+        - - "https://"
+          - !GetAtt
+            - S3Bucket
+            - DomainName
+      Description: Name of S3 bucket to hold website content

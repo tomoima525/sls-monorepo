@@ -1,0 +1,74 @@
+service: notes
+
+frameworkVersion: "2"
+# variablesResolutionMode: 20210219
+plugins:
+  - serverless-webpack
+
+custom:
+  webpack:
+    webpackConfig: "./webpack.config.js" # Name of webpack configuration file
+    includeModules: true # Node modules configuration for packaging
+    excludeFiles: src/**/*.test.js # Provide a glob for files to ignore
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  stage: ${opt:stage, 'dev'}
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+    shouldStartNameWithService: true
+  environment:
+    DEBUG: "*"
+    NODE_ENV: ${self:provider.stage}
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    DYNAMODB_TABLE_NOTES: ${file(../../serverless.yml):provider.environment.DYNAMODB_TABLE_NOTES}
+  tracing:
+    lambda: true
+  lambdaHashingVersion: 20201221
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:DescribeTable
+            - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_NOTES}"
+            - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_NOTES}/*"
+functions:
+  testPublic:
+    handler: functions/test/handler.publicRequest
+    events:
+      - http:
+          method: get
+          path: testPublic
+          cors: true
+  testPrivate:
+    handler: functions/test/handler.privateRequest
+    events:
+      - http:
+          method: get
+          path: testPrivate
+          authorizer: aws_iam
+          cors: true
+  postNote:
+    handler: functions/post/handler.postRequest
+    events:
+      - http:
+          method: post
+          path: note/post
+          authorizer: aws_iam
+          cors: true
+  getNotes:
+    handler: functions/getList/handler.getListRequest
+    events:
+      - http:
+          method: get
+          path: notes
+          authorizer: aws_iam
+          cors: true
